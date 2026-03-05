@@ -18,12 +18,13 @@
             background-color: #e5e5e5;
             display: flex; justify-content: center; align-items: center;
             height: 100vh;
+            /* 必须：禁止系统默认菜单，确保自定义长按生效 */
             -webkit-touch-callout: none;
             -webkit-user-select: none;
             user-select: none;
+            touch-action: none; /* 交由JS处理手势 */
         }
 
-        /* 模拟手机容器 */
         .phone-emulator {
             width: 375px; height: 812px;
             background-color: var(--bg-color);
@@ -37,14 +38,12 @@
         .status-bar { height: 44px; display: flex; justify-content: space-between; padding: 0 30px; align-items: center; font-size: 14px; font-weight: 600; }
         .back-icon { padding: 15px 20px; font-size: 20px; cursor: pointer; }
 
-        /* 用户卡片 */
         .profile-card {
             background: var(--card-bg);
             margin: 60px 20px 20px;
             border-radius: 24px;
             padding: 1px 20px 20px;
             text-align: center;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
 
         .avatar-container {
@@ -61,20 +60,11 @@
         .info h2 { margin: 5px 0; font-size: 22px; }
         .info p { color: var(--text-sub); margin-bottom: 25px; font-size: 14px; }
 
-        /* 四个功能按钮 */
         .actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 10px; }
-        .btn {
-            background: var(--accent); border-radius: 18px; padding: 14px 0;
-            font-size: 12px; color: #5d3a1a; font-weight: bold; text-align: center;
-        }
+        .btn { background: var(--accent); border-radius: 18px; padding: 14px 0; font-size: 12px; color: #5d3a1a; font-weight: bold; text-align: center; }
 
-        /* 下方列表项 - 还原内容 */
         .menu-list { margin-top: 15px; text-align: left; padding: 0 5px; }
-        .menu-item {
-            padding: 16px 0; border-bottom: 1px solid #f5f5f5;
-            display: flex; align-items: center; gap: 12px;
-            font-size: 16px; color: #333;
-        }
+        .menu-item { padding: 16px 0; border-bottom: 1px solid #f5f5f5; display: flex; align-items: center; gap: 12px; font-size: 16px; color: #333; }
         .menu-item:last-child { border: none; }
         .menu-item i { font-style: normal; font-size: 18px; }
 
@@ -84,8 +74,25 @@
             background: rgba(0,0,0,0.95);
             display: none; justify-content: center; align-items: center;
             z-index: 100;
+            overflow: hidden;
         }
-        #big-avatar { width: 100%; max-width: 375px; display: block; }
+
+        /* 大图图片容器 - 用于承载缩放变换 */
+        #img-viewport {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: none; /* 实时手势无需动画，避免卡顿 */
+        }
+
+        #big-avatar {
+            width: 100%;
+            max-width: 375px;
+            transform: scale(1);
+            will-change: transform;
+        }
 
         /* --- 长按保存菜单 --- */
         #save-menu {
@@ -97,10 +104,7 @@
         }
         .show-menu #save-menu { bottom: 20px; pointer-events: auto; }
         .menu-content { background: white; border-radius: 15px; overflow: hidden; }
-        .pop-btn {
-            padding: 18px; text-align: center; font-size: 17px;
-            color: #007aff; border-bottom: 1px solid #eee; cursor: pointer;
-        }
+        .pop-btn { padding: 18px; text-align: center; font-size: 17px; color: #007aff; border-bottom: 1px solid #eee; cursor: pointer; }
         .pop-btn.cancel { font-weight: bold; color: #ff3b30; border: none; }
     </style>
 </head>
@@ -125,7 +129,6 @@
             <div class="btn">💬 聊天</div>
         </div>
 
-        <!-- 还原的下方列表 -->
         <div class="menu-list">
             <div class="menu-item"><i>🗑️</i> 清空聊天记录</div>
             <div class="menu-item"><i>🚫</i> 拉黑</div>
@@ -136,7 +139,9 @@
 
     <!-- 交互层 -->
     <div id="overlay">
-        <img id="big-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=xxx" draggable="false">
+        <div id="img-viewport">
+            <img id="big-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=xxx" draggable="false">
+        </div>
         <div id="save-menu">
             <div class="menu-content">
                 <div class="pop-btn" onclick="confirmSave(event)">保存图片</div>
@@ -151,47 +156,82 @@
     const overlay = document.getElementById('overlay');
     const phone = document.getElementById('phone');
     const bigAvatar = document.getElementById('big-avatar');
+    const viewport = document.getElementById('img-viewport');
 
     let timer = null;
-    let isLongPressActive = false; // 锁定标志位
+    let isLongPressActive = false;
+    
+    // 缩放变量
+    let scale = 1;
+    let startDistance = 0;
+    let initialScale = 1;
 
     // 1. 点开头像
     avatarTrigger.addEventListener('click', () => {
+        scale = 1; // 重置缩放
+        bigAvatar.style.transform = `scale(${scale})`;
         overlay.style.display = 'flex';
     });
 
-    // 2. 长按逻辑判定
-    const startAction = (e) => {
-        timer = setTimeout(() => {
-            isLongPressActive = true; 
-            phone.classList.add('show-menu');
-        }, 600);
-    };
+    // 2. 核心手势逻辑：双指缩放 + 长按
+    viewport.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2) {
+            // 双指模式：计算初始距离
+            clearTimeout(timer); // 缩放时取消长按计时
+            startDistance = Math.hypot(
+                e.touches[0].pageX - e.touches[1].pageX,
+                e.touches[0].pageY - e.touches[1].pageY
+            );
+            initialScale = scale;
+        } else if (e.touches.length === 1) {
+            // 单指模式：启动长按计时
+            isLongPressActive = false;
+            timer = setTimeout(() => {
+                isLongPressActive = true; 
+                phone.classList.add('show-menu');
+            }, 600);
+        }
+    });
 
-    const endAction = (e) => {
+    viewport.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2) {
+            // 实时缩放计算
+            const currentDistance = Math.hypot(
+                e.touches[0].pageX - e.touches[1].pageX,
+                e.touches[0].pageY - e.touches[1].pageY
+            );
+            scale = initialScale * (currentDistance / startDistance);
+            
+            // 限制缩放范围
+            if (scale < 1) scale = 1; 
+            if (scale > 4) scale = 4;
+            
+            bigAvatar.style.transform = `scale(${scale})`;
+        } else {
+            // 移动手指则取消长按
+            clearTimeout(timer);
+        }
+    });
+
+    viewport.addEventListener('touchend', (e) => {
         clearTimeout(timer);
-    };
+    });
 
-    bigAvatar.addEventListener('touchstart', startAction);
-    bigAvatar.addEventListener('touchend', endAction);
-    bigAvatar.addEventListener('mousedown', startAction);
-    bigAvatar.addEventListener('mouseup', endAction);
-
-    // 3. 分层点击逻辑：处理“幽灵点击”和“分步取消”
+    // 3. 点击取消逻辑（分层逻辑）
     overlay.addEventListener('click', (e) => {
-        // 如果是长按触发的松手 click，拦截它
+        // 如果是长按松手，拦截
         if (isLongPressActive) {
-            isLongPressActive = false; 
+            isLongPressActive = false;
             return;
         }
 
-        // A. 如果弹出菜单开着：点任意处只关菜单，不退大图
+        // 如果菜单开着，仅关菜单
         if (phone.classList.contains('show-menu')) {
             phone.classList.remove('show-menu');
             return;
         }
 
-        // B. 正常点击大图或背景：立即退出大图
+        // 正常点击，退出大图
         overlay.style.display = 'none';
     });
 
@@ -201,9 +241,16 @@
         phone.classList.remove('show-menu');
         isLongPressActive = false;
     }
+
+    // 适配PC测试
+    viewport.addEventListener('mousedown', () => {
+        timer = setTimeout(() => {
+            isLongPressActive = true;
+            phone.classList.add('show-menu');
+        }, 600);
+    });
+    viewport.addEventListener('mouseup', () => clearTimeout(timer));
 </script>
 
 </body>
-
 </html>
-
