@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>头像大图交互 Demo</title>
+    <style>
+        :root {
+            --bg-color: #f8f4f2;
+            --card-bg: #ffffff;
+            --text-sub: #8e8e8e;
+            --accent: #fdf2e9;
+        }
+
+        body, html {
+            margin: 0; padding: 0;
+            font-family: -apple-system, system-ui, sans-serif;
+            background-color: #e5e5e5;
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        /* 模拟手机容器 */
+        .phone-emulator {
+            width: 375px; height: 812px;
+            background-color: var(--bg-color);
+            position: relative;
+            border-radius: 40px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+            overflow: hidden;
+            border: 8px solid #333;
+        }
+
+        .status-bar { height: 44px; display: flex; justify-content: space-between; padding: 0 30px; align-items: center; font-size: 14px; font-weight: 600; }
+        .back-icon { padding: 15px 20px; font-size: 20px; cursor: pointer; }
+
+        /* 用户卡片 */
+        .profile-card {
+            background: var(--card-bg);
+            margin: 60px 20px 20px;
+            border-radius: 24px;
+            padding: 1px 20px 20px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        .avatar-container {
+            width: 100px; height: 100px;
+            background: #fff;
+            border-radius: 30px;
+            margin: -50px auto 15px;
+            overflow: hidden;
+            border: 4px solid white;
+            cursor: pointer;
+        }
+        .avatar-container img { width: 100%; height: 100%; object-fit: cover; }
+
+        .info h2 { margin: 5px 0; font-size: 22px; }
+        .info p { color: var(--text-sub); margin-bottom: 25px; font-size: 14px; }
+
+        /* 四个功能按钮 */
+        .actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 10px; }
+        .btn {
+            background: var(--accent); border-radius: 18px; padding: 14px 0;
+            font-size: 12px; color: #5d3a1a; font-weight: bold; text-align: center;
+        }
+
+        /* 下方列表项 - 还原内容 */
+        .menu-list { margin-top: 15px; text-align: left; padding: 0 5px; }
+        .menu-item {
+            padding: 16px 0; border-bottom: 1px solid #f5f5f5;
+            display: flex; align-items: center; gap: 12px;
+            font-size: 16px; color: #333;
+        }
+        .menu-item:last-child { border: none; }
+        .menu-item i { font-style: normal; font-size: 18px; }
+
+        /* --- 大图遮罩层 --- */
+        #overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            display: none; justify-content: center; align-items: center;
+            z-index: 100;
+        }
+        #big-avatar { width: 100%; max-width: 375px; display: block; }
+
+        /* --- 长按保存菜单 --- */
+        #save-menu {
+            position: absolute; bottom: -220px; left: 0; width: 100%;
+            padding: 20px; box-sizing: border-box;
+            transition: bottom 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 101;
+            pointer-events: none;
+        }
+        .show-menu #save-menu { bottom: 20px; pointer-events: auto; }
+        .menu-content { background: white; border-radius: 15px; overflow: hidden; }
+        .pop-btn {
+            padding: 18px; text-align: center; font-size: 17px;
+            color: #007aff; border-bottom: 1px solid #eee; cursor: pointer;
+        }
+        .pop-btn.cancel { font-weight: bold; color: #ff3b30; border: none; }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+
+<div class="phone-emulator" id="phone">
+    <div class="status-bar"><span>11:03</span><span>📶 🔋</span></div>
+    <div class="back-icon"> 〈 </div>
+
+    <div class="profile-card">
+        <div class="avatar-container" id="avatarTrigger">
+            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=xxx" alt="avatar">
+        </div>
+        <div class="info">
+            <h2>xxx</h2>
+            <p>@xxx</p>
+        </div>
+        <div class="actions">
+            <div class="btn">🔔 静音</div>
+            <div class="btn">📌 置顶</div>
+            <div class="btn">🔍 搜索</div>
+            <div class="btn">💬 聊天</div>
+        </div>
+
+        <!-- 还原的下方列表 -->
+        <div class="menu-list">
+            <div class="menu-item"><i>🗑️</i> 清空聊天记录</div>
+            <div class="menu-item"><i>🚫</i> 拉黑</div>
+            <div class="menu-item"><i>💬</i> 举报</div>
+            <div class="menu-item"><i>👤</i> 添加联系人</div>
+        </div>
+    </div>
+
+    <!-- 交互层 -->
+    <div id="overlay">
+        <img id="big-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=xxx" draggable="false">
+        <div id="save-menu">
+            <div class="menu-content">
+                <div class="pop-btn" onclick="confirmSave(event)">保存图片</div>
+                <div class="pop-btn cancel">取消</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const avatarTrigger = document.getElementById('avatarTrigger');
+    const overlay = document.getElementById('overlay');
+    const phone = document.getElementById('phone');
+    const bigAvatar = document.getElementById('big-avatar');
+
+    let timer = null;
+    let isLongPressActive = false; // 锁定标志位
+
+    // 1. 点开头像
+    avatarTrigger.addEventListener('click', () => {
+        overlay.style.display = 'flex';
+    });
+
+    // 2. 长按逻辑判定
+    const startAction = (e) => {
+        timer = setTimeout(() => {
+            isLongPressActive = true; 
+            phone.classList.add('show-menu');
+        }, 600);
+    };
+
+    const endAction = (e) => {
+        clearTimeout(timer);
+    };
+
+    bigAvatar.addEventListener('touchstart', startAction);
+    bigAvatar.addEventListener('touchend', endAction);
+    bigAvatar.addEventListener('mousedown', startAction);
+    bigAvatar.addEventListener('mouseup', endAction);
+
+    // 3. 分层点击逻辑：处理“幽灵点击”和“分步取消”
+    overlay.addEventListener('click', (e) => {
+        // 如果是长按触发的松手 click，拦截它
+        if (isLongPressActive) {
+            isLongPressActive = false; 
+            return;
+        }
+
+        // A. 如果弹出菜单开着：点任意处只关菜单，不退大图
+        if (phone.classList.contains('show-menu')) {
+            phone.classList.remove('show-menu');
+            return;
+        }
+
+        // B. 正常点击大图或背景：立即退出大图
+        overlay.style.display = 'none';
+    });
+
+    function confirmSave(e) {
+        e.stopPropagation();
+        alert("已保存到系统相册");
+        phone.classList.remove('show-menu');
+        isLongPressActive = false;
+    }
+</script>
+
+</body>
+</html>
