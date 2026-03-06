@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>查看/修改自己头像 Demo 演示</title>
+    <style>
+        :root {
+            --ios-blue: #007AFF;
+            --ios-bg: #F2F2F7;
+            --ios-red: #FF3B30;
+            --card-bg: #FFFFFF;
+        }
+
+        /* 页面背景 */
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #1c1c1e;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica;
+        }
+
+        /* 手机外壳容器 */
+        .phone-mockup {
+            width: 375px;
+            height: 780px;
+            background: #000;
+            border-radius: 50px;
+            border: 10px solid #333;
+            box-shadow: 0 50px 100px rgba(0,0,0,0.6);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 手机顶部刘海 */
+        .notch {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 160px;
+            height: 34px;
+            background: #000;
+            border-bottom-left-radius: 20px;
+            border-bottom-right-radius: 20px;
+            z-index: 10000;
+        }
+
+        /* 内部屏幕内容 */
+        .screen {
+            width: 100%;
+            height: 100%;
+            background-color: var(--ios-bg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 导航栏 */
+        .nav-bar {
+            height: 94px;
+            background: #fff;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 12px;
+            border-bottom: 0.5px solid #c8c7cc;
+            font-weight: 600;
+            font-size: 17px;
+            box-sizing: border-box;
+        }
+        .back-btn { position: absolute; left: 16px; bottom: 12px; color: var(--ios-blue); font-weight: 400; font-size: 24px; line-height: 1; }
+
+        .profile-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 40px;
+        }
+
+        /* 头像盒 */
+        .avatar-box {
+            position: relative;
+            width: 110px;
+            height: 110px;
+            margin-bottom: 35px;
+            cursor: pointer;
+        }
+        .main-avatar {
+            width: 100%;
+            height: 100%;
+            border-radius: 24px;
+            object-fit: cover;
+            background: #eee;
+            /* 模拟 1:1 风景照 */
+            display: block;
+        }
+        .edit-badge {
+            position: absolute;
+            right: -6px;
+            top: -6px;
+            background: #fff;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+        }
+        .edit-badge svg { width: 18px; height: 18px; color: #555; }
+
+        /* 信息列表列表 */
+        .list-group {
+            width: 343px;
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .list-item {
+            padding: 16px;
+            border-bottom: 0.5px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 16px;
+        }
+        .list-item .label { color: #000; font-weight: 400; }
+        .list-item .value { color: #8e8e93; display: flex; align-items: center; }
+        .list-item .arrow { margin-left: 8px; font-size: 18px; color: #c7c7cc; }
+        .list-item:last-child { border-bottom: none; }
+
+        .del-account {
+            margin-top: 24px;
+            width: 343px;
+            background: var(--card-bg);
+            padding: 16px 0;
+            border-radius: 12px;
+            color: var(--ios-red);
+            text-align: center;
+            font-size: 17px;
+            cursor: pointer;
+        }
+
+        /* 查看层 (图2效果) */
+        #viewer-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0);
+            display: none;
+            z-index: 2000;
+            transition: background 0.35s ease;
+            align-items: center;
+            justify-content: center;
+        }
+        #viewer-overlay.active { background: rgba(0,0,0,1); }
+
+        .viewer-header {
+            position: absolute;
+            top: 50px;
+            width: 100%;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #fff;
+            font-size: 17px;
+            z-index: 2100;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        #viewer-img {
+            width: 110px;
+            height: 110px;
+            object-fit: cover;
+            border-radius: 24px;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 2050;
+        }
+
+        /* 动作面板 */
+        .mask {
+            position: absolute; top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0); display: none; z-index: 3000;
+            transition: background 0.3s;
+        }
+        .sheet {
+            position: absolute; bottom: -100%; left: 0; width: 100%;
+            z-index: 3100; transition: bottom 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+            padding-bottom: 24px;
+        }
+        .sheet-box {
+            margin: 0 10px 10px;
+            background: rgba(255,255,255,0.85);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border-radius: 14px;
+            overflow: hidden;
+        }
+        .btn {
+            padding: 18px; text-align: center; color: var(--ios-blue);
+            font-size: 20px; border-bottom: 0.5px solid rgba(0,0,0,0.1);
+        }
+        .btn:last-child { border-bottom: none; }
+        .btn:active { background: rgba(0,0,0,0.1); }
+        .cancel-btn { font-weight: 600; }
+
+    </style>
+</head>
+<body>
+
+    <div class="phone-mockup">
+        <div class="notch"></div>
+        
+        <div class="screen">
+            <div class="nav-bar">
+                <span class="back-btn">‹</span>
+                编辑资料
+            </div>
+
+            <div class="profile-content">
+                <div class="avatar-box" onclick="openFullView(this)">
+                    <img id="my-avatar" class="main-avatar" src="https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80" alt="flower avatar">
+                    <div class="edit-badge">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                    </div>
+                </div>
+
+                <div class="list-group">
+                    <div class="list-item"><span class="label">名字</span><span class="value">xxx<span class="arrow">›</span></span></div>
+                    <div class="list-item"><span class="label">用户名</span><span class="value">xxx<span class="arrow">›</span></span></div>
+                    <div class="list-item"><span class="label">手机号</span><span class="value">xxx</span></div>
+                </div>
+
+                <div class="del-account">删除账号</div>
+            </div>
+
+            <div id="viewer-overlay" onclick="closeFullView()">
+                <div class="viewer-header" id="v-header">
+                    <span onclick="closeFullView()">取消</span>
+                    <span style="font-weight: 600;" onclick="openMenu(event)">更改头像</span>
+                </div>
+                <img id="viewer-img">
+            </div>
+
+            <div class="mask" id="sheet-mask" onclick="closeMenu()"></div>
+            <div class="sheet" id="action-sheet">
+                <div class="sheet-box">
+                    <div class="btn" onclick="onSelect('相册')">相册</div>
+                    <div class="btn" onclick="onSelect('拍摄')">拍摄</div>
+                </div>
+                <div class="sheet-box">
+                    <div class="btn cancel-btn" onclick="closeMenu()">取消</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const myAvatar = document.getElementById('my-avatar');
+        const overlay = document.getElementById('viewer-overlay');
+        const viewerImg = document.getElementById('viewer-img');
+        const header = document.getElementById('v-header');
+        const sheet = document.getElementById('action-sheet');
+        const mask = document.getElementById('sheet-mask');
+
+        function openFullView(el) {
+            const rect = myAvatar.getBoundingClientRect();
+            const parentRect = document.querySelector('.screen').getBoundingClientRect();
+            
+            // 记录相对屏幕坐标
+            const initialTop = rect.top - parentRect.top;
+            const initialLeft = rect.left - parentRect.left;
+
+            viewerImg.src = myAvatar.src;
+            viewerImg.style.position = 'absolute';
+            viewerImg.style.top = initialTop + 'px';
+            viewerImg.style.left = initialLeft + 'px';
+            viewerImg.style.width = rect.width + 'px';
+            viewerImg.style.height = rect.height + 'px';
+            viewerImg.style.borderRadius = '24px';
+
+            overlay.style.display = 'flex';
+
+            setTimeout(() => {
+                overlay.classList.add('active');
+                header.style.opacity = '1';
+                
+                // 动画到正中心 1:1 正方形展示
+                const screenWidth = 375; 
+                viewerImg.style.top = '200px'; 
+                viewerImg.style.left = '0px';
+                viewerImg.style.width = screenWidth + 'px';
+                viewerImg.style.height = screenWidth + 'px';
+                viewerImg.style.borderRadius = '0px';
+            }, 15);
+        }
+
+        function closeFullView() {
+            const rect = myAvatar.getBoundingClientRect();
+            const parentRect = document.querySelector('.screen').getBoundingClientRect();
+            
+            const targetTop = rect.top - parentRect.top;
+            const targetLeft = rect.left - parentRect.left;
+
+            header.style.opacity = '0';
+            overlay.classList.remove('active');
+
+            viewerImg.style.top = targetTop + 'px';
+            viewerImg.style.left = targetLeft + 'px';
+            viewerImg.style.width = rect.width + 'px';
+            viewerImg.style.height = rect.height + 'px';
+            viewerImg.style.borderRadius = '24px';
+
+            setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 400);
+        }
+
+        function openMenu(e) {
+            e.stopPropagation();
+            mask.style.display = 'block';
+            setTimeout(() => {
+                mask.style.background = 'rgba(0,0,0,0.5)';
+                sheet.style.bottom = '10px';
+            }, 10);
+        }
+
+        function closeMenu() {
+            sheet.style.bottom = '-100%';
+            mask.style.background = 'rgba(0,0,0,0)';
+            setTimeout(() => {
+                mask.style.display = 'none';
+            }, 300);
+        }
+
+        function onSelect(type) {
+            // 可以在这里模拟更换头像成功的反馈
+            console.log('选择路径:', type);
+            closeMenu();
+        }
+    </script>
+</body>
+</html>
