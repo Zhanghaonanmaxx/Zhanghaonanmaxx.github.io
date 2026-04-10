@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>Language Selector</title>
+<style>
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont;
+    background: #f5f5f5;
+  }
+
+  .sheet {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    height: 85%;
+    background: #fff;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    padding: 16px;
+    overflow-y: auto;
+  }
+
+  .title {
+    text-align: center;
+    font-weight: 600;
+    font-size: 16px;
+    margin-bottom: 12px;
+  }
+
+  .search {
+    background: #f0f0f0;
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 16px;
+  }
+
+  .search input {
+    border: none;
+    background: transparent;
+    width: 100%;
+    outline: none;
+    font-size: 14px;
+  }
+
+  .section-title {
+    font-size: 13px;
+    color: gray;
+    margin: 10px 0;
+  }
+
+  .item {
+    padding: 12px 0;
+    border-bottom: 1px solid #eee;
+  }
+
+  .line1 {
+    font-size: 16px;
+    font-weight: 500;
+  }
+
+  .line2 {
+    font-size: 13px;
+    color: gray;
+    margin-top: 2px;
+  }
+
+</style>
+</head>
+<body>
+
+<div class="sheet">
+  <div class="title">选择源语言</div>
+
+  <div class="search">
+    <input id="search" placeholder="搜索" />
+  </div>
+
+  <div class="section-title">推荐语言</div>
+
+  <div id="list"></div>
+</div>
+
+<script>
+
+// ===== 去重音处理（关键！！！）=====
+function normalize(str) {
+  return str
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+// ===== 数据 =====
+const data = [
+  { native: "English", zh: "英语", en: "English", pinyin: "yingyu" },
+  { native: "español (España)", zh: "西班牙语（西班牙）", en: "Spanish", pinyin: "xibanyayu" },
+  { native: "简体中文", zh: "简体中文", en: "Chinese", pinyin: "jiantizhongwen" },
+  { native: "繁體中文", zh: "繁体中文", en: "Chinese Traditional", pinyin: "fantizhongwen" },
+  { native: "हिंदी (देवनागरी)", zh: "印地语（天城文）", en: "Hindi", pinyin: "yindiyu" },
+  { native: "العربية", zh: "阿拉伯语", en: "Arabic", pinyin: "alaboyu" },
+  { native: "русский", zh: "俄语", en: "Russian", pinyin: "eyu" },
+  { native: "français", zh: "法语", en: "French", pinyin: "fayu" },
+  { native: "Indonesia", zh: "印度尼西亚语", en: "Indonesian", pinyin: "yindunixiyayu" },
+  { native: "Türkçe", zh: "土耳其语", en: "Turkish", pinyin: "tuerqiyu" }
+];
+
+// ===== 渲染 =====
+function render(list) {
+  const container = document.getElementById("list");
+  container.innerHTML = "";
+
+  list.forEach(item => {
+    const div = document.createElement("div");
+    div.className = "item";
+
+    div.innerHTML = `
+      <div class="line1">${item.native}</div>
+      <div class="line2">${item.zh}</div>
+    `;
+
+    container.appendChild(div);
+  });
+}
+
+// ===== 搜索逻辑 =====
+function search(keyword) {
+  if (!keyword) return data;
+
+  const key = normalize(keyword);
+
+  return data.filter(item => {
+
+    const native = normalize(item.native);
+    const zh = normalize(item.zh);
+    const en = normalize(item.en);
+    const pinyin = item.pinyin;
+
+    // 前缀匹配
+    return (
+      native.startsWith(key) ||
+      zh.startsWith(key) ||
+      en.startsWith(key) ||
+      pinyin.startsWith(key)
+    );
+  });
+}
+
+// ===== 初始化 =====
+render(data);
+
+// ===== 监听 =====
+document.getElementById("search").addEventListener("input", e => {
+  const result = search(e.target.value);
+  render(result);
+});
+
+</script>
+
+</body>
+</html>
